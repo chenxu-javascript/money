@@ -1,0 +1,38 @@
+name: 新股打新提醒
+
+on:
+  schedule:
+    # 工作日每天 10:30 (UTC+8) 执行，即 02:30 UTC
+    - cron: "30 2 * * 1-5"
+
+  # 允许手动触发
+  workflow_dispatch:
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 设置 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: 安装依赖
+        run: npm install
+
+      - name: 执行打新提醒
+        env:
+          WECHAT_WEBHOOK: ${{ secrets.WECHAT_WEBHOOK }}
+        run: npm start
+
+      - name: 显示执行结果
+        if: always()
+        run: |
+          echo "=========================================="
+          echo "执行完成时间: $(date)"
+          echo "=========================================="
