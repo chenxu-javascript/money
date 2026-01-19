@@ -10,7 +10,7 @@ async function main() {
   console.log(
     `📅 执行时间: ${new Date().toLocaleString("zh-CN", {
       timeZone: "Asia/Shanghai",
-    })}`
+    })}`,
   );
   console.log("========================================\n");
 
@@ -32,6 +32,9 @@ async function main() {
     // 获取新股数据
     const stocks = await fetcher.fetchIPOData();
 
+    console.log(`📋 [调试] 主程序收到的新股数据: ${JSON.stringify(stocks)}`);
+    console.log(`📋 [调试] 新股数量: ${stocks.length}`);
+
     if (stocks.length === 0) {
       console.log("ℹ️  当前没有可申购的新股");
       await bot.sendMarkdown(
@@ -39,7 +42,7 @@ async function main() {
           `> 当前没有可申购的新股\n\n` +
           `⏰ 查询时间：${new Date().toLocaleString("zh-CN", {
             timeZone: "Asia/Shanghai",
-          })}`
+          })}`,
       );
       return;
     }
@@ -71,11 +74,17 @@ async function main() {
  * 构建消息内容
  */
 function buildMessage(stocks) {
+  console.log(
+    `📋 [调试] buildMessage 收到的股票数据: ${JSON.stringify(stocks, null, 2)}`,
+  );
+
   let message = `## 📊 新股打新提醒\n\n`;
   message += `> 共有 **${stocks.length}** 只新股可申购\n\n`;
 
   // 今天可申购的
   const today = stocks.filter((s) => s.daysUntil === 0);
+  console.log(`📋 [调试] 过滤条件 daysUntil === 0 的结果: ${today.length} 只`);
+  console.log(`📋 [调试] 今天的新股详情: ${JSON.stringify(today, null, 2)}`);
   if (today.length > 0) {
     message += `### 🔥 今天可申购 (${today.length}只)\n\n`;
     today.forEach((stock) => {
@@ -111,12 +120,30 @@ function formatStockInfo(stock, isToday) {
   const daysText =
     stock.daysUntil === 0 ? "**今天**" : `${stock.daysUntil}天后`;
 
-  return (
-    `${urgentFlag}**${stock.name}** (${stock.code})\n` +
-    `> 申购代码：<font color="info">${stock.subscribeCode}</font>\n` +
-    `> 发行价格：<font color="warning">${stock.issuePrice}元</font>\n` +
-    `> 申购日期：<font color="comment">${stock.subscribeDate}</font> (${daysText})\n\n`
-  );
+  let info = `${urgentFlag}**${stock.name}** (${stock.code})\n`;
+  info += `> 申购代码：<font color="info">${stock.subscribeCode}</font>\n`;
+  info += `> 发行价格：<font color="warning">${stock.issuePrice}元</font>\n`;
+
+  // 新增字段
+  if (stock.issueVolume) {
+    info += `> 发行量：<font color="comment">${stock.issueVolume}</font>\n`;
+  }
+  if (stock.purchaseLimit) {
+    info += `> 申购限额：<font color="comment">${stock.purchaseLimit}</font>\n`;
+  }
+  if (stock.peRatio) {
+    info += `> 发行市盈率：<font color="warning">${stock.peRatio}</font>\n`;
+  }
+  if (stock.winningRate) {
+    info += `> 中签率：<font color="info">${stock.winningRate}</font>\n`;
+  }
+  if (stock.winningNumberDate) {
+    info += `> 中签号公布日：<font color="comment">${stock.winningNumberDate}</font>\n`;
+  }
+
+  info += `> 申购日期：<font color="comment">${stock.subscribeDate}</font> (${daysText})\n\n`;
+
+  return info;
 }
 
 // 执行主程序
