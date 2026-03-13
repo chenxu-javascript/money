@@ -465,12 +465,6 @@ class StockIPOFetcher {
       stocks = this.loadFromConfigFile();
     }
 
-    // 最后一个兜底：使用本地测试数据验证逻辑
-    if (stocks.length === 0) {
-      console.log("📋 [调试] 配置文件为空，使用本地测试数据进行验证...");
-      stocks = this.getMockTestData();
-    }
-
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);
     console.log(`✅ 成功获取 ${stocks.length} 只新股数据 (耗时: ${duration}s)`);
     console.log(

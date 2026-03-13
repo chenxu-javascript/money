@@ -1,10 +1,16 @@
+import dotenv from "dotenv";
+dotenv.config();
+
 import WeChatBot from "./wechat.js";
+import BarkBot from "./bark.js";
 import StockIPOFetcher from "./fetcher.js";
 
 /**
  * 主程序
  */
 async function main() {
+  const dryRun = process.env.DRY_RUN === "true";
+
   console.log("========================================");
   console.log("🚀 新股打新提醒程序启动");
   console.log(
@@ -12,6 +18,9 @@ async function main() {
       timeZone: "Asia/Shanghai",
     })}`,
   );
+  if (dryRun) {
+    console.log("🧪 测试模式: 仅打印消息，不实际发送");
+  }
   console.log("========================================\n");
 
   // 从环境变量获取 Webhook 地址
@@ -27,6 +36,8 @@ async function main() {
   try {
     // 创建实例
     const bot = new WeChatBot(webhookUrl);
+    const barkUrl = process.env.BARK_URL || "https://api.day.app/Y6cqYXibkdBHwMkWo4A65B";
+    const bark = new BarkBot(barkUrl);
     const fetcher = new StockIPOFetcher();
 
     // 获取新股数据
@@ -36,29 +47,34 @@ async function main() {
     console.log(`📋 [调试] 新股数量: ${stocks.length}`);
 
     if (stocks.length === 0) {
-      console.log("ℹ️  当前没有可申购的新股");
-      await bot.sendMarkdown(
-        `## 📊 新股打新提醒\n\n` +
-          `> 当前没有可申购的新股\n\n` +
-          `⏰ 查询时间：${new Date().toLocaleString("zh-CN", {
-            timeZone: "Asia/Shanghai",
-          })}`,
-      );
+      console.log("ℹ️  当前没有可申购的新股，不推送消息");
       return;
     }
 
     // 构建消息内容
     const message = buildMessage(stocks);
-    console.log("\n📤 准备发送消息...\n");
-    console.log(message);
 
-    // 发送消息
-    const result = await bot.sendMarkdown(message);
+    // 构建并发送 Bark 消息
+    const barkMessage = buildBarkMessage(stocks);
 
-    if (result.success) {
-      console.log("\n✅ 提醒发送成功！");
+    if (dryRun) {
+      console.log("\n📤 [测试模式] 企业微信消息（不实际发送）:\n");
+      console.log(message);
+      console.log("\n📤 [测试模式] Bark 消息（不实际发送）:\n");
+      console.log(`💰 打新提醒\n${barkMessage}`);
     } else {
-      console.error("\n❌ 提醒发送失败！");
+      console.log("\n📤 准备发送消息...\n");
+      console.log(message);
+
+      // 发送消息
+      const result = await bot.sendMarkdown(message);
+      const barkResult = await bark.send("💰 打新提醒", barkMessage);
+
+      if (result.success || (barkResult && barkResult.success)) {
+        console.log("\n✅ 提醒发送成功！");
+      } else {
+        console.error("\n❌ 提醒发送失败！");
+      }
     }
   } catch (error) {
     console.error("❌ 程序执行出错:", error);
@@ -108,6 +124,33 @@ function buildMessage(stocks) {
     timeZone: "Asia/Shanghai",
   })}\n`;
   message += `💡 提示：请及时登录证券账户进行申购`;
+
+  return message;
+}
+
+/**
+ * 构建 Bark 消息内容（纯文本兼容版）
+ */
+function buildBarkMessage(stocks) {
+  let message = `共有 ${stocks.length} 只新股可申购\n`;
+
+  // 今天可申购的
+  const today = stocks.filter((s) => s.daysUntil === 0);
+  if (today.length > 0) {
+    message += `\n[今天可申购(${today.length}只)]\n`;
+    today.forEach((stock) => {
+      message += `🚨 ${stock.name}(${stock.subscribeCode}) - 发行价:${stock.issuePrice}元\n`;
+    });
+  }
+
+  // 未来几天可申购的
+  const upcoming = stocks.filter((s) => s.daysUntil > 0);
+  if (upcoming.length > 0) {
+    message += `\n[未来可申购(${upcoming.length}只)]\n`;
+    upcoming.forEach((stock) => {
+      message += `📅 ${stock.name}(${stock.subscribeCode}) - ${stock.daysUntil}天后申购\n`;
+    });
+  }
 
   return message;
 }
